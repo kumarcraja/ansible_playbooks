@@ -1,0 +1,21 @@
+- name: Deploy a web application
+  hosts: db_and_web_server
+  become: yes
+  tasks:
+    - name: Stop firewalld
+      systemd:
+        name: firewalld
+        state: stopped
+        enabled: no
+
+    - name: Disable SELinux
+      selinux:
+        state: disabled
+
+    - name: Install all required dependencies
+      yum:
+        name: ['epel-release', 'python36', 'python', 'MySQL-python', 'python-setuptools']
+        state: installed
+
+    - include: tasks/deploy_db.yaml
+    - include: tasks/deploy_web.yaml

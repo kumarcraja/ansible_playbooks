@@ -1,0 +1,6 @@
+root_db_user: root
+root_db_pass: centos
+db_name: employee_db
+db_user: db_user
+db_pass: Passw0rd
+ansible_sudo_pass: centos

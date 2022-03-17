@@ -1,0 +1,71 @@
+---
+    - name: Install MySQL database
+      yum:
+        name: ['mariadb-server']
+        state: installed
+      register: mysql_install
+
+    - name: Start MySQL Service
+      systemd:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    - name: delete anonymous MySQL server user for {{ ansible_hostname }}
+      action: mysql_user user="" host="{{ ansible_hostname }}" state="absent"
+      when: mysql_install.changed
+
+    - name: delete anonymous MySQL server user for localhost
+      action: mysql_user user="" state="absent"
+      when: mysql_install.changed
+
+    - name: remove the MySQL test database
+      action: mysql_db db=test state=absent
+      when: mysql_install.changed
+
+    - name: Change root user password on first run
+      mysql_user:
+        login_user: "{{ root_db_user }}"
+        login_password: ''
+        name: "{{ root_db_user }}"
+        password: "{{ root_db_pass }}"
+        priv: '*.*:ALL,GRANT'
+        host: "{{ item }}"
+      with_items:
+        - "{{ ansible_hostname }}"
+        - '%'
+        - '127.0.0.1'
+        - '::1'
+        - 'localhost'
+      when: mysql_install.changed
+
+    - name: Create Applicaiton database
+      mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_user: "{{ root_db_user }}"
+        login_password: "{{ root_db_pass }}"
+
+    - name: Create Database user
+      mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_pass }}"
+        priv: '*.*:ALL,GRANT'
+        state: present
+        host: '%'
+        login_user: "{{ root_db_user }}"
+        login_password: "{{ root_db_pass }}"
+
+    - name: Create table employees
+      community.mysql.mysql_query:
+        login_user: "{{ db_user }}"
+        login_password: "{{ db_pass }}"
+        login_db: "{{ db_name }}"
+        query: create table IF NOT EXISTS employees (name varchar(20))
+
+    - name: Insert data into table employees
+      community.mysql.mysql_query:
+        login_user: "{{ db_user }}"
+        login_password: "{{ db_pass }}"
+        login_db: "{{ db_name }}"
+        query: insert into employees (name) values ('C_Raja')

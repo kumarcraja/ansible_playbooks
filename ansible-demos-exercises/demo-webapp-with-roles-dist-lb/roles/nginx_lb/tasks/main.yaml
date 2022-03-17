@@ -1,0 +1,21 @@
+---
+    - name: Ensure Nginx is installed and it is the latest version
+      yum:
+         name: nginx
+         state: present
+
+    - name: Start Nginx
+      systemd:
+          name: nginx
+          state: started
+          enabled: yes
+
+    - name: Copy the Nginx config file and restart nginx
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/conf.d/loadbalncer.conf
+
+    - name: Restart nginx
+      systemd:
+        name: nginx
+        state: restarted

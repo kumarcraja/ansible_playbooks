@@ -1,0 +1,28 @@
+---
+    - name: Install Python Flask dependencies
+      pip:
+        name: ['flask','flask-mysql']
+        state: present
+        executable: pip3
+
+    - name: Get pid of running flask application
+      shell: " ps -few | grep  '/usr/bin/python3 /usr/local/bin/flask run --host=0.0.0.0' | head -1 | awk '{print $2}'"
+      register: flask_pid
+
+    - name: Kill running flask app processes
+      ignore_errors: yes
+      shell: "kill {{ item }}"
+      with_items: "{{ flask_pid.stdout_lines }}"
+
+    - name: Copy application source code
+      template : src=app.py.j2 dest=/opt/app.py
+
+    - name: debug message print db_serer group first server ip
+      debug:
+        var: hostvars[groups['db_server'][0]]['private_ip']
+
+    - name: debug pring appserver startup command
+      debug: msg="MYSQL_DATABASE_HOST={{ hostvars[groups['db_server'][0]]['private_ip'] }} FLASK_APP=/opt/app.py nohup /usr/local/bin/flask run --host=0.0.0.0 &"
+
+    - name: Start Web server
+      shell: MYSQL_DATABASE_HOST={{ hostvars[groups['db_server'][0]]['private_ip'] }} FLASK_APP=/opt/app.py nohup /usr/local/bin/flask run --host=0.0.0.0 &

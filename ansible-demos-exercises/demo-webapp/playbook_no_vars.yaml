@@ -1,0 +1,107 @@
+- name: Deploy a web application
+  hosts: target1
+  become: yes
+  tasks:
+    - name: Stop firewalld
+      systemd:
+        name: firewalld
+        state: stopped
+        enabled: no
+
+    - name: Disable SELinux
+      selinux:
+        state: disabled
+
+    - name: Install all required dependencies
+      yum: name={{ item }}  state=installed
+      with_items:
+        - epel-release
+        - python36
+        - python
+        - MySQL-python
+        - python-setuptools
+
+    - name: Install MySQL database
+      yum: name={{ item }}  state=installed
+      with_items:
+        - mariadb-server
+
+    - name: Start MySQL Service
+      systemd:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    - name: delete anonymous MySQL server user for {{ ansible_hostname }}
+      action: mysql_user user="" host="{{ ansible_hostname }}" state="absent"
+      ignore_errors: yes
+
+    - name: delete anonymous MySQL server user for localhost
+      action: mysql_user user="" state="absent"
+      ignore_errors: yes
+
+    - name: remove the MySQL test database
+      action: mysql_db db=test state=absent
+      ignore_errors: yes
+
+    - name: Change root user password on first run
+      mysql_user:
+        login_user: root
+        login_password: ''
+        name: root
+        password: centos
+        priv: '*.*:ALL,GRANT'
+        host: "{{ item }}"
+      with_items:
+        - "{{ ansible_hostname }}"
+        - '%'
+        - '127.0.0.1'
+        - '::1'
+        - 'localhost'
+      ignore_errors: yes
+
+    - name: Create Applicaiton database
+      mysql_db:
+        name: employee_db
+        state: present
+        login_user: root
+        login_password: centos
+
+    - name: Create Database user
+      mysql_user:
+        name: db_user
+        password: Passw0rd
+        priv: '*.*:ALL,GRANT'
+        state: present
+        host: '%'
+        login_user: root
+        login_password: centos
+
+    - name: Create table employees
+      community.mysql.mysql_query:
+        login_user: db_user
+        login_password: Passw0rd
+        login_db: employee_db
+        query: create table IF NOT EXISTS employees (name varchar(20))
+
+    - name: Insert data into table employees
+      community.mysql.mysql_query:
+        login_user: db_user
+        login_password: Passw0rd
+        login_db: employee_db
+        query: insert into employees (name) values ('C_Raja')
+
+    - name: Install Python Flask dependencies
+      pip:
+        name: '{{ item }}'
+        state: present
+        executable: pip3
+      with_items:
+        - flask
+        - flask-mysql
+
+    - name: Copy application source code
+      copy: src=app.py dest=/opt/app.py
+
+    - name: Start Web server
+      shell: FLASK_APP=/opt/app.py nohup /usr/local/bin/flask run --host=0.0.0.0 &

@@ -1,0 +1,117 @@
+- name: Deploy a web application
+  hosts: target1
+  vars:
+    root_db_user: root
+    root_db_pass: centos
+    db_name: employee_db
+    db_user: db_user
+    db_pass: Passw0rd
+    ansible_sudo_pass: centos
+  become: yes
+  tasks:
+    - name: Stop firewalld
+      systemd:
+        name: firewalld
+        state: stopped
+        enabled: no
+
+    - name: Disable SELinux
+      selinux:
+        state: disabled
+
+    - name: Install all required dependencies
+      yum:
+        name: ['epel-release', 'python36', 'python', 'MySQL-python', 'python-setuptools']
+        state: installed
+
+    - name: Install MySQL database
+      yum:
+        name: ['mariadb-server']
+        state: installed
+      register: mysql_install
+
+    - name: Start MySQL Service
+      systemd:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    - name: delete anonymous MySQL server user for {{ ansible_hostname }}
+      action: mysql_user user="" host="{{ ansible_hostname }}" state="absent"
+      when: mysql_install.changed
+
+    - name: delete anonymous MySQL server user for localhost
+      action: mysql_user user="" state="absent"
+      when: mysql_install.changed
+
+    - name: remove the MySQL test database
+      action: mysql_db db=test state=absent
+      when: mysql_install.changed
+
+    - name: Change root user password on first run
+      mysql_user:
+        login_user: "{{ root_db_user }}"
+        login_password: ''
+        name: "{{ root_db_user }}"
+        password: "{{ root_db_pass }}"
+        priv: '*.*:ALL,GRANT'
+        host: "{{ item }}"
+      with_items:
+        - "{{ ansible_hostname }}"
+        - '%'
+        - '127.0.0.1'
+        - '::1'
+        - 'localhost'
+      when: mysql_install.changed
+
+    - name: Create Applicaiton database
+      mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_user: "{{ root_db_user }}"
+        login_password: "{{ root_db_pass }}"
+
+    - name: Create Database user
+      mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_pass }}"
+        priv: '*.*:ALL,GRANT'
+        state: present
+        host: '%'
+        login_user: "{{ root_db_user }}"
+        login_password: "{{ root_db_pass }}"
+
+    - name: Create table employees
+      community.mysql.mysql_query:
+        login_user: "{{ db_user }}"
+        login_password: "{{ db_pass }}"
+        login_db: "{{ db_name }}"
+        query: create table IF NOT EXISTS employees (name varchar(20))
+
+    - name: Insert data into table employees
+      community.mysql.mysql_query:
+        login_user: "{{ db_user }}"
+        login_password: "{{ db_pass }}"
+        login_db: "{{ db_name }}"
+        query: insert into employees (name) values ('C_Raja')
+
+    - name: Install Python Flask dependencies
+      pip:
+        name: ['flask','flask-mysql']
+        state: present
+        executable: pip3
+
+    - name: Get pid of running flask application
+      shell: " ps -few | grep  '/usr/bin/python3 /usr/local/bin/flask run --host=0.0.0.0' | head -1 | awk '{print $2}'"
+      register: flask_pid
+
+    - name: Kill running flask app processes
+      ignore_errors: yes
+      shell: "kill {{ item }}"
+      with_items: "{{ flask_pid.stdout_lines }}"
+
+    - name: Copy application source code
+      copy: src=app.py dest=/opt/app.py
+
+    - name: Start Web server
+      shell: FLASK_APP=/opt/app.py nohup /usr/local/bin/flask run --host=0.0.0.0 &

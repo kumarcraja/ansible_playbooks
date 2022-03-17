@@ -1,0 +1,5 @@
+[web_server]
+target1 ansible_host=target1.local ansible_ssh_pass='centos' private_ip=192.168.1.101
+
+[db_server]
+target2 ansible_host=target2.local ansible_ssh_pass='centos' private_ip=192.168.1.103

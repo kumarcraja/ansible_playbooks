@@ -1,0 +1,43 @@
+
+from flask import Flask
+from flask import request
+from flask import jsonify
+from flaskext.mysql import MySQL
+app = Flask(__name__)
+
+mysql = MySQL()
+
+app.config['MYSQL_DATABASE_USER'] = 'db_user'
+app.config['MYSQL_DATABASE_PASSWORD'] = 'Passw0rd'
+app.config['MYSQL_DATABASE_DB'] = 'employee_db'
+app.config['MYSQL_DATABASE_HOST'] = "{{ hostvars[groups['db_server'][0]]['private_ip'] | default('localhost') }}"
+mysql.init_app(app)
+
+conn = mysql.connect()
+cursor = conn.cursor()
+
+@app.route("/")
+def main():
+    return "Welcome"
+
+@app.route("/get_my_ip", methods=["GET"])
+def get_my_ip():
+    return jsonify({'host': request.headers.get('Host') }), 200
+
+@app.route('/how are you')
+def hello():
+    return "I am good, how about you?"
+
+@app.route('/read from database')
+def read():
+    cursor.execute("select * from employees")
+    row = cursor.fetchone()
+    result = []
+    while row is not None:
+        result.append(row[0])
+        row = cursor.fetchone()
+
+    return ",".join(result)
+
+if __name__ == "__main__":
+    app.run()

@@ -1,0 +1,20 @@
+    - name: Install Python Flask dependencies
+      pip:
+        name: ['flask','flask-mysql']
+        state: present
+        executable: pip3
+
+    - name: Get pid of running flask application
+      shell: " ps -few | grep  '/usr/bin/python3 /usr/local/bin/flask run --host=0.0.0.0' | head -1 | awk '{print $2}'"
+      register: flask_pid
+
+    - name: Kill running flask app processes
+      ignore_errors: yes
+      shell: "kill {{ item }}"
+      with_items: "{{ flask_pid.stdout_lines }}"
+
+    - name: Copy application source code
+      copy: src=app.py dest=/opt/app.py
+
+    - name: Start Web server
+      shell: FLASK_APP=/opt/app.py nohup /usr/local/bin/flask run --host=0.0.0.0 &

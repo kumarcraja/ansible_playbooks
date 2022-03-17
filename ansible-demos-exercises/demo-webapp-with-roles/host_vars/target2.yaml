@@ -1,0 +1,2 @@
+ansible_host: target2.local
+ansible_ssh_pass: 'centos'

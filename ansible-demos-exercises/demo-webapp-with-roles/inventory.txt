@@ -1,0 +1,2 @@
+[db_and_web_server]
+target1 ansible_host=target1.local ansible_ssh_pass='centos'

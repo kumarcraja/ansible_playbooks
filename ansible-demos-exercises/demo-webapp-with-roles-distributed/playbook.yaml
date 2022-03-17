@@ -1,0 +1,15 @@
+- name: Deploy a MySQL Database server
+  hosts: db_server
+  become: yes
+  roles:
+    - disable_sl_fw
+    - python_deb
+    - mysql_db
+
+- name: Deploy a Web application
+  hosts: web_server
+  become: yes
+  roles:
+    - disable_sl_fw
+    - python_deb
+    - flask_web

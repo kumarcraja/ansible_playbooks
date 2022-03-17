@@ -1,0 +1,14 @@
+upstream backend  {
+  server {{ hostvars[groups['web_server'][0]]['private_ip'] | default('localhost') }}:5000;  #server-1
+  server {{ hostvars[groups['web_server'][1]]['private_ip'] | default('localhost') }}:5000;  #server-2
+}
+
+server {
+  listen 80;  #listen on port 80
+
+  server_name {{ hostvars[groups['load_balancer'][0]]['ansible_host'] | default('localhost') }};
+  location / {
+    proxy_read_timeout 300s;
+    proxy_pass  http://backend;  #pass all requests processed to the backend upstream servers
+  }
+}
